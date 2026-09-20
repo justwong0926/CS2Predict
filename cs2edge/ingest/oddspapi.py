@@ -165,11 +165,16 @@ def _devig(p1, p2):
 
 def ingest_range(con, start: dt.date, end: dt.date) -> dict:
     resolver = TeamResolver(con)
-    stats = {"fixtures": 0, "matched": 0, "odds_stored": 0, "no_pinnacle": 0}
+    # already-stored fixtures: skip so repeated/forward runs don't burn quota
+    have = {r[0] for r in con.execute("SELECT fixture_id FROM odds_pinnacle").fetchall()}
+    stats = {"fixtures": 0, "matched": 0, "odds_stored": 0, "no_pinnacle": 0, "skipped": 0}
     rows = []
     for frm, to in _windows(start, end):
         for f in _fixtures(frm, to):
             stats["fixtures"] += 1
+            if f.get("fixtureId") in have:
+                stats["skipped"] += 1
+                continue
             start_ts = _ts(f.get("startTime"))
             id1 = resolver.team_id(f.get("participant1Name"), f.get("participant1ShortName"), f.get("participant1Abbr"))
             id2 = resolver.team_id(f.get("participant2Name"), f.get("participant2ShortName"), f.get("participant2Abbr"))

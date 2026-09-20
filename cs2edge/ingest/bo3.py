@@ -163,7 +163,7 @@ def backfill_games(con, since: str = "2024-01-01") -> dict:
     """Per-map results for CS2-era matches. Winner resolved to team id via the
     match's two teams (clan_name -> team1/team2)."""
     matches = con.execute(
-        "SELECT m.match_id, m.team1_id, m.team2_id, t1.name, t2.name "
+        "SELECT m.match_id, m.team1_id, m.team2_id, t1.name, t1.slug, t2.name, t2.slug "
         "FROM matches m JOIN teams t1 ON t1.team_id=m.team1_id "
         "JOIN teams t2 ON t2.team_id=m.team2_id "
         "WHERE m.start_date >= ? AND m.match_id NOT IN (SELECT DISTINCT match_id FROM games) "
@@ -172,15 +172,18 @@ def backfill_games(con, since: str = "2024-01-01") -> dict:
     ).fetchall()
     n_matches = n_maps = 0
     buf = []
-    for match_id, t1, t2, n1, n2 in matches:
-        norm1, norm2 = _norm(n1), _norm(n2)
+    for match_id, t1, t2, n1, s1, n2, s2 in matches:
+        alias1 = {_norm(n1), _norm(s1)}
+        alias2 = {_norm(n2), _norm(s2)}
         for g in fetch_games(match_id):
-            if g.get("status") != "finished":
+            # a map counts if it was actually played (has a result), regardless
+            # of the exact status string
+            if g.get("winner_clan_score") is None or not g.get("winner_clan_name"):
                 continue
             wn = _norm(g.get("winner_clan_name"))
-            if wn == norm1:
+            if wn in alias1:
                 win, lose = t1, t2
-            elif wn == norm2:
+            elif wn in alias2:
                 win, lose = t2, t1
             else:
                 continue  # unresolved winner name
