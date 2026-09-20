@@ -1,8 +1,23 @@
+import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 DUCKDB_PATH = DATA_DIR / "cs2.duckdb"
+
+
+def _load_env() -> None:
+    envf = REPO_ROOT / ".env"
+    if envf.exists():
+        for line in envf.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_env()
+ODDSPAPI_KEY = os.environ.get("ODDSPAPI_KEY")
 
 # --- data sources ---
 # Match/team/player stats

@@ -38,6 +38,23 @@ CREATE TABLE IF NOT EXISTS matches (
     status         VARCHAR,
     ingested_at    TIMESTAMP DEFAULT now()
 );
+
+-- Pinnacle closing line per match (the sharp benchmark), via OddsPapi.
+-- match_id is the bo3 join (NULL until matched); de-vigged fair probs.
+CREATE TABLE IF NOT EXISTS odds_pinnacle (
+    fixture_id        VARCHAR PRIMARY KEY,
+    match_id          BIGINT,
+    p1_name           VARCHAR,
+    p2_name           VARCHAR,
+    start_time        TIMESTAMP,
+    close_ts          TIMESTAMP,
+    team1_close_price DOUBLE,   -- decimal odds at close
+    team2_close_price DOUBLE,
+    team1_fair        DOUBLE,   -- de-vigged
+    team2_fair        DOUBLE,
+    close_limit       DOUBLE,   -- Pinnacle limit at close (sharpness signal)
+    n_snapshots       INTEGER
+);
 """
 
 
