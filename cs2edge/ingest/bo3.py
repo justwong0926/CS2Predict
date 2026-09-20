@@ -149,6 +149,67 @@ def fetch_teams(con, limit: int = 100) -> int:
     return total
 
 
+def _norm(s):
+    import re
+    return re.sub(r"[^a-z0-9]", "", s.lower()) if s else ""
+
+
+def fetch_games(match_id: int) -> list[dict]:
+    data = _get("/api/v1/games", {"filter[games.match_id][eq]": match_id, "page[limit]": 20})
+    return data.get("results", [])
+
+
+def backfill_games(con, since: str = "2024-01-01") -> dict:
+    """Per-map results for CS2-era matches. Winner resolved to team id via the
+    match's two teams (clan_name -> team1/team2)."""
+    matches = con.execute(
+        "SELECT m.match_id, m.team1_id, m.team2_id, t1.name, t2.name "
+        "FROM matches m JOIN teams t1 ON t1.team_id=m.team1_id "
+        "JOIN teams t2 ON t2.team_id=m.team2_id "
+        "WHERE m.start_date >= ? AND m.match_id NOT IN (SELECT DISTINCT match_id FROM games) "
+        "ORDER BY m.start_date",
+        [since],
+    ).fetchall()
+    n_matches = n_maps = 0
+    buf = []
+    for match_id, t1, t2, n1, n2 in matches:
+        norm1, norm2 = _norm(n1), _norm(n2)
+        for g in fetch_games(match_id):
+            if g.get("status") != "finished":
+                continue
+            wn = _norm(g.get("winner_clan_name"))
+            if wn == norm1:
+                win, lose = t1, t2
+            elif wn == norm2:
+                win, lose = t2, t1
+            else:
+                continue  # unresolved winner name
+            buf.append([g.get("id"), match_id, g.get("map_name"), g.get("number"),
+                        win, lose, g.get("winner_clan_score"), g.get("loser_clan_score"),
+                        _ts(g.get("begin_at")), g.get("status")])
+            n_maps += 1
+        n_matches += 1
+        if len(buf) >= 200:
+            _store_games(con, buf); buf = []
+        if n_matches % 200 == 0:
+            print(f"  {n_matches} matches, {n_maps} maps ...")
+    _store_games(con, buf)
+    return {"matches": n_matches, "maps": n_maps}
+
+
+_GAME_COLS = ["game_id", "match_id", "map_name", "map_number", "winner_team_id",
+              "loser_team_id", "winner_score", "loser_score", "start_date", "status"]
+
+
+def _store_games(con, rows):
+    if rows:
+        con.executemany(
+            f"INSERT OR REPLACE INTO games ({', '.join(_GAME_COLS)}) "
+            f"VALUES ({', '.join('?' * len(_GAME_COLS))})",
+            rows,
+        )
+
+
 if __name__ == "__main__":
     init_db()
     con = connect()

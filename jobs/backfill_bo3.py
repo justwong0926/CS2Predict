@@ -15,16 +15,20 @@ from cs2edge.ingest import bo3
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--teams", action="store_true", help="also backfill teams")
+    ap.add_argument("--games", action="store_true", help="backfill per-map results (CS2 era)")
+    ap.add_argument("--games-only", action="store_true", help="only per-map results")
     args = ap.parse_args()
 
     init_db()
     con = connect()
     try:
-        n = bo3.backfill_matches(con)
-        print(f"matches: {n}")
-        if args.teams:
-            t = bo3.fetch_teams(con)
-            print(f"teams: {t}")
+        if not args.games_only:
+            n = bo3.backfill_matches(con)
+            print(f"matches: {n}")
+            if args.teams:
+                print(f"teams: {bo3.fetch_teams(con)}")
+        if args.games or args.games_only:
+            print(f"games: {bo3.backfill_games(con)}")
     finally:
         con.close()
 

@@ -39,6 +39,20 @@ CREATE TABLE IF NOT EXISTS matches (
     ingested_at    TIMESTAMP DEFAULT now()
 );
 
+-- One row per map played (bo3 "game"). winner/loser resolved to team ids.
+CREATE TABLE IF NOT EXISTS games (
+    game_id       BIGINT PRIMARY KEY,
+    match_id      BIGINT,
+    map_name      VARCHAR,
+    map_number    INTEGER,
+    winner_team_id BIGINT,
+    loser_team_id  BIGINT,
+    winner_score  INTEGER,
+    loser_score   INTEGER,
+    start_date    TIMESTAMP,
+    status        VARCHAR
+);
+
 -- Pinnacle closing line per match (the sharp benchmark), via OddsPapi.
 -- match_id is the bo3 join (NULL until matched); de-vigged fair probs.
 CREATE TABLE IF NOT EXISTS odds_pinnacle (
